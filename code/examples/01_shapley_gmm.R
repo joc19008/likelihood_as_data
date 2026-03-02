@@ -14,8 +14,8 @@ source(here::here("code","functions.R"))
 
 
 # For exact replication of the figures in the paper, we provide precomputed results in
-# output/shapley_gmm.RData:
-# load(here::here("output", "shapley_gmm.RData"))
+# output/shapley_gmm_fitted.RData:
+# load(here::here("output", "shapley_gmm_fitted.RData"))
 
 
 # Otherwise, the scripts below also allow recomputing the results from the raw data;
@@ -41,21 +41,22 @@ n_post_samples <- 1000
 # -------------------------------------------------------------------
 # Fit Gaussian mixtures, build LaD matrix Z, AIC/BIC, LaD posterior
 # -------------------------------------------------------------------
-set.seed(20260303)  # for reproducibility of random initializations
+set.seed(23512)  # for reproducibility of random initializations
 
 results_Z <- vector("list", length(sample_sizes))
 results_fits <- vector("list", length(sample_sizes))
 results_AIC <- vector("list", length(sample_sizes))
 results_BIC <- vector("list", length(sample_sizes))
 results_mu <- vector("list", length(sample_sizes))
-names(results_Z) <- names(results_fits) <- names(results_AIC)  <- names(results_BIC) <- names(results_mu) <- as.character(sample_sizes)
+names(results_Z) <- names(results_fits) <- names(results_AIC) <- names(results_BIC) <- names(results_mu) <- as.character(sample_sizes)
 
 for (n in sample_sizes) {
   cat("Fitting GMM for Sample size:", n, "\n")
   x_n <- x[1:n]
 
   fits <- vector("list", Kmax)
-  Z <- matrix(NA, nrow = n, ncol = Kmax)
+  Z <- matrix(NA, nrow = n, ncol = Kmax)  # raw per-point NLL
+  Z_bc <- matrix(NA, nrow = n, ncol = Kmax)  # bias-corrected per-point NLL
   
   for (K in 1:Kmax) {
     best_fit <- NULL
@@ -89,14 +90,14 @@ for (n in sample_sizes) {
     
     # Bias correction dk/(2n) with dk = 3K - 1 
     dk <- 3*K-1
-    Z[, K] <- Z[, K] + dk/(2*n)
+    Z_bc[, K] <- Z[, K] + dk/(2*n)
   }
   
-  results_Z[[as.character(n)]] <- Z
+  results_Z[[as.character(n)]] <- Z_bc
   results_fits[[as.character(n)]] <- fits
   
   # AIC/BIC using the same log-likelihood definition
-  logLik <- -colSums(Z)              
+  logLik <- -colSums(Z)
   dK <- 3*(1:Kmax) - 1 # parameter count 
   AIC <- 2*dK - 2*logLik
   BIC <- log(n)*dK - 2*logLik
@@ -105,7 +106,7 @@ for (n in sample_sizes) {
   results_BIC[[as.character(n)]] <- BIC
   
   # LaD posterior draws
-  mu_samples <- niw_posterior(Z, mu0, lambda0, Psi0, nu0, n_post_samples)$mu
+  mu_samples <- niw_posterior(Z_bc, mu0, lambda0, Psi0, nu0, n_post_samples)$mu
   results_mu[[as.character(n)]] <- mu_samples
 }
 
@@ -116,7 +117,7 @@ results_Z <- lapply(results_Z,  function(Z) Z[, 1:10])
 
 # save results for later reuse 
 # save(results_mu, results_AIC, results_BIC, results_Z, results_fits, x,
-#      file = here::here("output", "shapley_gmm.RData"))
+#      file = here::here("output", "shapley_gmm_fitted.RData"))
 
 
 
@@ -518,7 +519,7 @@ fig.gmm
 
 
 # fig_dir <- here::here("output", "figures")
-# ggsave(file.path(fig_dir, "shapley_gmm_result.png"), fig.gmm, width = 15, height = 20, dpi = 300)
+# ggsave(file.path(fig_dir, "shapley_fig3.png"), fig.gmm, width = 15, height = 20, dpi = 300)
 
 
 

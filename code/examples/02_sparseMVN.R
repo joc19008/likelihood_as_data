@@ -1,4 +1,6 @@
-.libPaths("~/rlibs")
+# 02_sparseMVN.R
+# Sparse multivariate normal example (Section 5.2.1)
+
 options(pillar.sigfig = 3)
 
 library(MCMCpack)
@@ -9,13 +11,24 @@ library(latex2exp)
 library(cowplot)
 library(grid)
 
+source(here::here("code", "functions.R"))
+
+
+# For exact replication of the figures in the paper, we provide precomputed results in
+# output/sparseMVN_fitted.Rdata:
+load(here::here("output", "sparseMVN_fitted.Rdata"))
+# After load this, you can jump directly to codes to create Figures below. 
+
+# Otherwise, the scripts below also allow recomputing the results from the raw data;
+# these may differ slightly up to random sampling, but yield the same qualitative conclusions.
+
+
 # ---------------------------
 # Generate data from MVN 
 # ---------------------------
 generate_data_mvn <- function(n) {
-  # true_mean <- c(1, 1, 0.3, 0.3, 0.25, 0)  # True mean parameters
   true_mean <- c(1, 1, 0.5, 0.5, 0.4, 0)  # True mean parameters
-  true_cov <- diag(6)                      # 6 x 6 identity covariance matrix
+  true_cov <- diag(6) # 6 x 6 identity covariance matrix
   x <- rmvnorm(n, mean = true_mean, sigma = true_cov)
   return(x)
 }
@@ -37,59 +50,64 @@ fit_models <- function(x, models) {
     model_coeffs <- ifelse(1:d %in% models[[k]], beta_hats, 0)
     # Compute residuals for each observation.
     resids <- x - matrix(model_coeffs, n, d, byrow = TRUE)
-    # Under the assumption of a multivariate normal with identity covariance, the 
-    # (un-normalized) negative log-likelihood for each observation is given by:
+    # Negative log-likelihood for each observation under MVN with identity covariance
     Z[, k] <- 0.5*rowSums(resids^2) + (d/2) * log(2*pi)
   }
-  
   return(Z)
 }
 
 
+# -------------------------------------------------------------------
+# KL distances (Table 1)
+# -------------------------------------------------------------------
+
+KL_for_model <- function(mu_T, S) 0.5 * sum(mu_T[-S]^2)
+
+# Example with your seven models:
+mu_T <- c(1, 1, 0.5, 0.5, 0.4, 0)
+D1 <- KL_for_model(mu_T, c(1,4))
+D2 <- KL_for_model(mu_T, c(1,2))
+D3 <- KL_for_model(mu_T, c(1,2,5))
+D4 <- KL_for_model(mu_T, c(1,2,4))
+D5 <- KL_for_model(mu_T, c(1,2,3))
+D6 <- KL_for_model(mu_T, c(1,2,3,4,5))
+D7 <- KL_for_model(mu_T, 1:6)
+KL_true <- c(D1, D2, D3, D4, D5, D6, D7)
+cat("True KL divergences (Table 1):", round(KL_true, 3), "\n")
+
+
+
 #############################
 # Simulation Settings
-#############################
-# seed <- 1243412
-# seed <- 25102021
-seed <- 251102
-set.seed(seed)
+############################# 
+set.seed(23512)
 
 # Candidate models: each model is defined by the indices (columns) whose parameters are free.
 models <- list(
   c(1,4),          # Model 1.
   c(1,2),          # Model 2.
   c(1,2,5),        # Model 3: Only the first three parameters free.
-  c(1,2,3),        # Model 4.
-  c(1,2,4),        # Model 5.
+  c(1,2,4),        # Model 4.
+  c(1,2,3),        # Model 5.
   c(1,2,3,4,5),    # Model 6: Parameter 6 fixed to 0.
   c(1,2,3,4,5,6)   # Model 7: All parameters free.
 )
 
 K <- length(models)
 
-df_k <- vapply(models, length, integer(1))
+df_k <- vapply(models, length, integer(1)) # Number of free means per model: d_k = |J_k|
 
 # Complexity levels for the candidate models (lower number means simpler).
-complexities <- c(1, 1, 2, 2, 2, 3, 4)
+# complexities <- c(1, 1, 2, 2, 2, 3, 4)
+complexities <- df_k # should be identical.
 
 # Simulation parameters
-# sample_sizes <- c(50, 500, 5000)
-sample_sizes <- c(50, 100, 500, 1000, 5000, 10000)
+sample_sizes <- c(50, 500, 5000)
 n_max <- max(sample_sizes)  # Maximum sample size used to generate sample 
-n_sim <- 50      # Number of simulation replicates.
+n_sim <- 50 # Number of simulation replicates.
 n_post_samples <- 1000      # Number of NIW posterior samples per simulation replicate.
 
-# gamma_values <- c(1, 0.082, 0.01) # 0.091/1.12125
-# gamma_values <- c(1, 0.3, 0.01) # 0.5 / 1.70125
-# gamma_values <- c(1, 0.083, 0.085, 0.09, 0.05, 0.045, 0.01)
-
-# noise: 0.5*(1^2 + 1^2 + 0.5^2 + 0.5^2 + 0.25^2) = 1.28125
-# delta_values <- 1.12125 * gamma_values
-# delta_values <- c(1, 0.092, 0.02)
-# delta_values <- c(1, 0.26, 0.02)
 delta_values <- c(0.75, 0.255, 0.05)
-# delta_values <- 1.28125 * gamma_values
-# delta_values <- c(0.01, 0.091, 0.58)  # Tolerance levels based on ture KL divergence.
 
 # NIW Prior Parameters
 mu0 <- rep(0, K) # Prior mean (vector of zeros).
@@ -98,8 +116,6 @@ nu0 <- K + 2 # Degrees of freedom (must be > K-1).
 Psi0 <- 1 * diag(K)  # Prior inverse scale matrix.
 
 # NIG priors
-# mu0 <- rep(0, K)
-# lambda0 <- 0.01
 a0 <- rep((nu0 - K + 1)/2, K) 
 b0 <- rep(diag(Psi0)/2, each = 1) 
 
@@ -107,10 +123,11 @@ b0 <- rep(diag(Psi0)/2, each = 1)
 alphas <- c(10, 100, Inf)
 
 
-#############################
-# Simulation Phase A: run simulation over replicated datasets and sample sizes 
-#############################
 
+
+#############################
+# Run simulation over 50 replicated datasets and sample sizes 
+#############################
 store_x <- list()
 store_Z <- list()
 
@@ -118,11 +135,9 @@ lad_rows   <- list()
 aicbic_rows <- list()
 coarse_rows <- list()
 
-# y <- generate_data_mvn(n=100000)
-# z <- fit_models(y, models)
-# true_cov <- cov(z)
 
 for (sim in 1:n_sim) {
+  # cat("Simulation: ", sim, "\n")
   x_full <- generate_data_mvn(n = n_max) 
   
   for (n in sample_sizes) {
@@ -130,59 +145,55 @@ for (sim in 1:n_sim) {
     x <- x_full[1:n, ]
     Z <- fit_models(x, models)
 
-    Z  <- t(t(Z) + df_k/(2*n)) 
+    # Bias-corrected LaD values: Z_{ik} + d_k/(2n)
+    Z_bc  <- t(t(Z) + df_k/(2*n)) 
     
     # Save x and Z
-    df_x <- as_tibble(x) |>
-      mutate(i = row_number()) |>
-      pivot_longer(-i, names_to = "dim", values_to = "xij") |>
+    df_x <- as_tibble(x) %>%
+      mutate(i = row_number()) %>%
+      pivot_longer(-i, names_to = "dim", values_to = "xij") %>%
       mutate(sim = sim, sample_size = n, .before = 1)
     
     store_x[[length(store_x) + 1]] <- df_x
     
-    df_Z <- as_tibble(Z) |>
-      mutate(i = row_number()) |>
-      pivot_longer(-i, names_to = "model_idx", values_to = "Zik") |>
-      mutate(k = as.integer(sub("V","", model_idx))) |>
-      select(i, k, Zik) |>
+    df_Z <- as_tibble(Z_bc) %>%
+      mutate(i = row_number()) %>%
+      pivot_longer(-i, names_to = "model_idx", values_to = "Zik") %>%
+      mutate(k = as.integer(sub("V","", model_idx))) %>%
+      select(i, k, Zik) %>%
       mutate(sim = sim, sample_size = n, .before = 1)
     
     store_Z[[length(store_Z) + 1]] <- df_Z
     
     
     # LaD posteriors
-    mu_niw <- niw_posterior(Z, mu0, lambda0, Psi0, nu0, n_post_samples)$mu # NIW bayesian inference
-    # Sigma_samples <- niw_posterior(Z, mu0, lambda0, Psi0, nu0, n_post_samples)$Sigma # NIW bayesian inference
-    # mu_samples <- rmvnorm(n_post_samples, colMeans(Z), cov(Z) / n) # using normal distribution
-    # mu_samples <- rmvnorm(n_post_samples, colMeans(Z), true_cov / n) # using true mu, cov.
-    mu_nig <- nig_posterior(Z, mu0, lambda0, a0, b0, n_post_samples)$mu
+    mu_niw <- niw_posterior(Z_bc, mu0, lambda0, Psi0, nu0, n_post_samples)$mu 
+    mu_nig <- nig_posterior(Z_bc, mu0, lambda0, a0, b0, n_post_samples)$mu
     
     # NIW
-    df_niw <- as_tibble(mu_niw) |>
-      mutate(draw = row_number()) |>
-      pivot_longer(-draw, names_to = "k", values_to = "mu_sample") |>
+    df_niw <- as_tibble(mu_niw) %>%
+      mutate(draw = row_number()) %>%
+      pivot_longer(-draw, names_to = "k", values_to = "mu_sample") %>%
       mutate(k = as.integer(sub("V","", k)),
              complexity = complexities[k],
              method = "LaD_NIW",
-             sim = sim, n = n, .before = 1) |>
+             sim = sim, n = n, .before = 1) %>%
       select(sim, n, k, complexity, method, draw, mu_sample)
     
     # NIG
-    df_nig <- as_tibble(mu_nig) |>
-      mutate(draw = row_number()) |>
-      pivot_longer(-draw, names_to = "k", values_to = "mu_sample") |>
+    df_nig <- as_tibble(mu_nig) %>%
+      mutate(draw = row_number()) %>%
+      pivot_longer(-draw, names_to = "k", values_to = "mu_sample") %>%
       mutate(k = as.integer(sub("V","", k)),
              complexity = complexities[k],
              method = "LaD_NIG",
-             sim = sim, n = n, .before = 1) |>
+             sim = sim, n = n, .before = 1) %>%
       select(sim, n, k, complexity, method, draw, mu_sample)
     
     lad_rows[[length(lad_rows)+1]] <- bind_rows(df_niw, df_nig)
     
     
     # AIC and BIC
-    # df_k <- vapply(models, length, integer(1))   # number of free means per model
-    
     logLik <- -colSums(Z)
     AIC <- 2 * df_k - 2 * logLik              
     BIC <- log(n) * df_k - 2 * logLik       
@@ -213,7 +224,7 @@ for (sim in 1:n_sim) {
       ~coarsen_post_probs(
         x, models, alpha = .x,
         kappa0 = 0.01, m0 = rep(0, ncol(x)),
-        prior_wts = NULL                 # uniform prior
+        prior_wts = NULL  # uniform prior
       )
     ) %>%
       dplyr::mutate(sim = sim, n = n, .before = 1) %>%
@@ -236,12 +247,12 @@ df_Coarsen <- bind_rows(coarse_rows)
 
 
 
-# gamma values
+# tau values
 df_d <- df_x_all %>%
   group_by(sim, sample_size) %>%
   summarise(d = n_distinct(dim), .groups = "drop")
 
-# mu_noise(sim,n) = (d/2)log(2π) + 0.5 * mean_i [ sum_j x_{ij}^2 ]
+# mu_noise(sim,n) = (d/2)log(2 \pi) + 0.5 * mean_i [ sum_j x_{ij}^2 ]
 df_mu_noise <- df_x_all %>%
   group_by(sim, sample_size, i) %>%
   summarise(row_sqsum = sum(xij^2), .groups = "drop") %>%
@@ -258,12 +269,12 @@ df_mu_star <- df_Z_all %>%
   group_by(sim, sample_size) %>%
   summarise(mu_star = min(mu_k), .groups = "drop")
 
-# gamma dataframe
-df_gamma <- df_mu_noise %>%
+# tau dataframe
+df_tau <- df_mu_noise %>%
   left_join(df_mu_star, by = c("sim","sample_size")) %>%
   mutate(denom = mu_noise - mu_star) %>%
   tidyr::crossing(tibble(delta = delta_values)) %>%
-  mutate(gamma = delta / denom) %>%
+  mutate(tau = delta / denom) %>%
   rename(n = sample_size)
 
 
@@ -271,18 +282,18 @@ df_gamma <- df_mu_noise %>%
 
 
 #############################
-# Simulation Phase B: compute scores and compare with other methods 
+# Compute scores and compare with other methods 
 #############################
 
 # Metrics
 brier_loss <- function(p, A) sum((p-A)^2)
-gini_loss <- function(p, A) sum(A*(1-p) + (1-A)*p)
+# gini_loss <- function(p, A) sum(A*(1-p) + (1-A)*p)
 # log_loss <- function(p, A) sum(-A*log(p) - (1-A)*log(1-p))
-log_loss <- function(p, A) {
-  t1 <- ifelse(A == 1, -log(p), 0)
-  t2 <- ifelse(A == 0, -log(1 - p), 0)
-  sum(t1 + t2)
-}
+# log_loss <- function(p, A) {
+#   t1 <- ifelse(A == 1, -log(p), 0)
+#   t2 <- ifelse(A == 0, -log(1 - p), 0)
+#   sum(t1 + t2)
+# }
 
 truth_sets <- list(large = c(2), middle = c(4,5), small = c(6))
 delta_to_truth <- tibble::tibble(delta = delta_values, set_name = names(truth_sets))
@@ -302,7 +313,7 @@ for (delta in delta_values) {
     alpha_n_soft <- n^(0.45) # LaD-soft / LaD-diag
     
     for (sim in 1:n_sim) {
-      gamma_val <- df_gamma %>% filter(sim == !!sim, n == !!n, delta == !!delta) %>% pull(gamma)
+      tau_val <- df_tau %>% filter(sim == !!sim, n == !!n, delta == !!delta) %>% pull(tau)
       
       # LaD
       for (lad_core in c("LaD_NIW", "LaD_NIG")) {
@@ -321,24 +332,24 @@ for (delta in delta_values) {
           # soft-minimum 
           what_soft <- selection_probabilities(mat_mu, complexities, delta, alpha_n = alpha_n_soft, mode = "soft")
           score_rows[[length(score_rows)+1]] <- tibble::tibble(
-            sim = sim, n = n, delta = delta, gamma = gamma_val,
+            sim = sim, n = n, delta = delta, tau = tau_val,
             method = if (lad_core == "LaD_NIW") "LaD_FC_soft" else "LaD_DC_soft",
             k = seq_len(K), score = what_soft,
             S_brier = brier_loss(what_soft, A_vec),
-            S_log = log_loss(what_soft, A_vec),
-            S_gini = gini_loss(what_soft, A_vec)
+            # S_log = log_loss(what_soft, A_vec),
+            # S_gini = gini_loss(what_soft, A_vec)
           )
           
           # hard-minimum; only for FC 
           if (lad_core == "LaD_NIW") {
             what_hard <- selection_probabilities(mat_mu, complexities, delta, alpha_n = NA, mode = "hard")
             score_rows[[length(score_rows)+1]] <- tibble::tibble(
-              sim = sim, n = n, delta = delta, gamma = gamma_val,
+              sim = sim, n = n, delta = delta, tau = tau_val,
               method = "LaD_FC_hard",
               k = seq_len(K), score = what_hard,
               S_brier = brier_loss(what_hard, A_vec),
-              S_log   = log_loss(what_hard, A_vec),
-              S_gini  = gini_loss(what_hard, A_vec)
+              # S_log   = log_loss(what_hard, A_vec),
+              # S_gini  = gini_loss(what_hard, A_vec)
             )
           }
         }
@@ -354,12 +365,12 @@ for (delta in delta_values) {
           p <- grp$prob
           lbl <- if (is.infinite(a)) "Bayes" else paste0("c-post ($\\alpha = ", a, "$)")
           score_rows[[length(score_rows)+1]] <- tibble::tibble(
-            sim = sim, n = n, delta = delta, gamma = gamma_val,
+            sim = sim, n = n, delta = delta, tau = tau_val,
             method = lbl,
             k = seq_len(K), score = p,
             S_brier = brier_loss(p, A_vec),
-            S_log   = log_loss(p, A_vec),
-            S_gini  = gini_loss(p, A_vec)
+            # S_log   = log_loss(p, A_vec),
+            # S_gini  = gini_loss(p, A_vec)
           )
         }
       }
@@ -372,24 +383,24 @@ for (delta in delta_values) {
         k_star <- unique(df_aic_slice$chosen_k)
         p_aic <- as.numeric(seq_len(K) == k_star)
         score_rows[[length(score_rows)+1]] <- tibble::tibble(
-          sim = sim, n = n, delta = delta, gamma = gamma_val,
+          sim = sim, n = n, delta = delta, tau = tau_val,
           method = "AIC",
           k = seq_len(K), score = p_aic,
           S_brier = brier_loss(p_aic, A_vec),
-          S_log = log_loss(p_aic, A_vec),
-          S_gini = gini_loss(p_aic, A_vec)
+          # S_log = log_loss(p_aic, A_vec),
+          # S_gini = gini_loss(p_aic, A_vec)
         )
       }
       if (nrow(df_bic_slice) > 0) {
         k_star <- unique(df_bic_slice$chosen_k)
         p_bic <- as.numeric(seq_len(K) == k_star)
         score_rows[[length(score_rows)+1]] <- tibble::tibble(
-          sim = sim, n = n, delta = delta, gamma = gamma_val,
+          sim = sim, n = n, delta = delta, tau = tau_val,
           method = "BIC",
           k = seq_len(K), score = p_bic,
           S_brier = brier_loss(p_bic, A_vec),
-          S_log = log_loss(p_bic, A_vec),
-          S_gini = gini_loss(p_bic, A_vec)
+          # S_log = log_loss(p_bic, A_vec),
+          # S_gini = gini_loss(p_bic, A_vec)
         )
       }
     } # sim
@@ -399,23 +410,22 @@ for (delta in delta_values) {
 df_scores <- bind_rows(score_rows)
 
 
-
-
-cat("Save results...\n")
-# save(df_x_all, df_Z_all, df_LaD, df_AICBIC, df_Coarsen, df_gamma, df_scores, file = paste("Output/251105_mvn_sim_seed_", seed, ".Rdata", sep=""))
-cat("Results saved successfully.\n")
-
-load("Output/251105_mvn_sim_seed_251102.Rdata")
-
-
-df_gamma %>% dplyr::filter(sim==25)
+# cat("Save results...\n")
+# save(df_x_all, df_Z_all, df_LaD, df_AICBIC, df_Coarsen, df_tau, df_scores, file = "output/sparseMVN_fitted.Rdata")
+# cat("Results saved successfully.\n")
 
 
 
+################################################
+# Figure 4
+################################################
+# df_tau %>% dplyr::filter(sim==25)
+
+delta_values <- c(0.75, 0.255, 0.05)
+K <- 7
 
 # Summarizing LaD plot
 labels_delta <- setNames(
-  # paste0("delta==", signif(delta_values, 2), "*';'~gamma==", signif(gamma_values, 2)),
   paste0("delta==", round(delta_values, 2)),
   delta_values
 )
@@ -423,34 +433,15 @@ labels_delta <- setNames(
 plot_dat <- df_scores %>%
   filter(n %in% c(50, 500, 5000)) %>% 
   filter(method == "LaD_FC_soft") %>%
-  select(sim, n, delta, gamma, k, score) %>%
+  select(sim, n, delta, tau, k, score) %>%
   mutate(
     sample_size = factor(n, levels = sort(unique(n))),
     model = factor(k, labels=c(1:K)), 
     delta = factor(delta, levels = delta_values, labels = labels_delta)
   )
 
-# highlight_tbl <- plot_dat %>%
-#   distinct(sample_size, delta, sim) %>%
-#   group_by(sample_size, delta) %>%
-#   slice_sample(n = 5) %>%
-#   ungroup() %>%
-#   mutate(highlight = TRUE)
-
-
-# highlight_tbl <- plot_dat %>%
-#   distinct(sample_size, delta, sim) %>%
-#   # filter(sim %in% c(1, 2, 4, 5, 10)) %>%
-#   filter(sim %in% c(25)) %>% # 25, 45
-#   mutate(highlight = TRUE)
-# 
-# plot_dat2 <- plot_dat %>%
-#   left_join(highlight_tbl, by = c("sample_size","delta","sim")) %>%
-#   mutate(highlight = !is.na(highlight))
-
-
 plot_dat_bar <- plot_dat %>%
-  filter(sim == 25)
+  filter(sim == 2) # One representative data set for Figure 4
 
 summary_plot <- ggplot(plot_dat_bar, aes(x = model, y = score, fill = delta, color=delta)) +
   geom_col(color = "black", width = 0.8, show.legend = FALSE) +
@@ -476,35 +467,6 @@ summary_plot <- ggplot(plot_dat_bar, aes(x = model, y = score, fill = delta, col
     axis.text = element_text(size = 15),
     axis.title.y = element_text(angle = 0, vjust = 0.5, margin = margin(r = 5))
   )
-
-summary_plot
-
-
-# library(grid)
-# 
-# g <- ggplotGrob(summary_plot)
-# 
-# strip_idx <- grep("^strip-l", g$layout$name) # all left strips
-# old_strip_cols <- unique(g$layout$l[strip_idx]) # their current column(s)
-# strip_col_width <- g$widths[old_strip_cols[1]] # Use the existing strip column width to size the new column
-# g <- gtable::gtable_add_cols(g, strip_col_width, pos = 0) # Insert a new column at the extreme left (before everything)
-# new_col <- 1  # the new leftmost column index
-# 
-# # Move strips into the new leftmost column
-# g$layout$l[strip_idx] <- new_col
-# g$layout$r[strip_idx] <- new_col
-# 
-# old_strip_cols_after <- old_strip_cols + 1
-# g$widths[old_strip_cols_after] <- unit(0, "pt")
-# 
-# grid.newpage()
-# grid.draw(g)
-
-
-
-# ggsave("Figures/251019_mvn_sim.png", summary_plot, width = 10, height = 8, dpi = 300, device = "png")
-
-
 
 
 # Mu plot
@@ -533,48 +495,6 @@ p_mu <- ggplot(df_LaD_NIW, aes(x = factor(k), y = mu_sample)) +
     axis.title.y = element_text(angle = 0, vjust = 0.5, margin = margin(r = 5))
   )
 
-p_mu
-
-
-# Boxplots for mu_{nk} - mu_n^*
-df_centered <- df_LaD_NIW %>%
-  dplyr::group_by(sim, n, draw) %>%
-  dplyr::mutate(mu_star = min(mu_sample)) %>%
-  dplyr::ungroup() %>%
-  dplyr::mutate(mu_diff = mu_sample - mu_star)
-
-delta_lines <- tidyr::expand_grid(n = sample_sizes, delta = delta_values) %>%
-  dplyr::mutate(delta_lab = factor(signif(delta, 2), levels = signif(delta_values, 2)))
-
-ymax_center <- max(0,
-                   max(df_centered$mu_diff, na.rm = TRUE),
-                   max(delta_values, na.rm = TRUE))
-ygrid_center <- pretty(c(0, ymax_center), n = 5)
-
-p_qoi <- ggplot(df_centered, aes(x = factor(k), y = mu_diff)) +
-  geom_boxplot(width = 0.6, outlier.size = 0.3, color = "black", fill = "white") +
-  geom_hline(data = delta_lines,
-             aes(yintercept = delta, color = delta_lab),
-             linewidth = 0.6, show.legend = FALSE) +
-  geom_vline(xintercept = seq(1, K_max, 1), color = "grey70", linewidth = 0.2, alpha = 0.3) +
-  geom_hline(yintercept = ygrid_center, color = "grey70", linewidth = 0.2, alpha = 0.3) +
-  scale_color_manual(values = c("orange", "purple1", "green3")) +
-  scale_y_continuous(limits = range(ygrid_center), breaks = ygrid_center) +
-  facet_wrap(~ n, nrow = 1, labeller = labeller(n = function(v) paste0("n = ", v))) +
-  labs(x = "k", y = expression(mu[k] - mu^"*")) +
-  theme_bw(base_size = 13) +
-  theme(
-    panel.grid = element_blank(),
-    strip.text = element_text(size = 16),
-    strip.background = element_rect(fill = "white", color = "black"),
-    axis.title = element_text(size = 15),
-    axis.text  = element_text(size = 13),
-    axis.title.y = element_text(angle = 0, vjust = 0.5, margin = margin(r = 5))
-  )
-
-p_qoi
-
-
 
 fig.mvn <- plot_grid(
   summary_plot, p_mu, 
@@ -583,22 +503,22 @@ fig.mvn <- plot_grid(
 )
 fig.mvn
 
-# ggsave("Figures/251019_p_qoi.png", p_qoi, width = 10, height = 5, dpi = 300)
-ggsave("Figures/251111_mvn_result.png", fig.mvn, width = 12, height = 12, dpi = 300)
+
+# save for Figure 4
+# fig_dir <- here::here("output", "figures")
+# ggsave(file.path(fig_dir, "sparseMVN_fig4.png"), fig.mvn, width = 12, height = 12, dpi = 300)
 
 
 
 
-
-# Metrics
+# -------------------------------------------------------------------
+# Figure 5 -- Metrics: mean Brier loss with s.e. across methods
+# -------------------------------------------------------------------
 df_scores_dataset <- df_scores %>%
   dplyr::filter(n %in% c(50, 500, 5000)) %>%
   dplyr::group_by(sim, n, delta, method) %>%
   dplyr::summarise(
-    S_brier = dplyr::first(S_brier),
-    S_log = dplyr::first(S_log),
-    S_gini = dplyr::first(S_gini),
-    .groups = "drop"
+    S_brier = dplyr::first(S_brier)
   )
 
 df_scores_summary <- df_scores_dataset %>%
@@ -606,12 +526,7 @@ df_scores_summary <- df_scores_dataset %>%
   dplyr::summarise(
     M = dplyr::n(),
     E_brier = round(mean(S_brier), 3),
-    SE_brier = round(sd(S_brier)/sqrt(M), 3),
-    E_log = round(mean(S_log), 3),
-    SE_log = round(sd(S_log)/sqrt(M), 3),
-    E_gini = round(mean(S_gini), 3),
-    SE_gini = round(sd(S_gini)/sqrt(M), 3),
-    .groups = "drop"
+    SE_brier = round(sd(S_brier)/sqrt(M), 3)
   )
 
 
@@ -646,6 +561,28 @@ color_vals <- c(
 # )
 
 
+# shape_vals <- c(
+#   "LaD-soft"              = 16,  # filled circle
+#   "LaD-hard"              = 17,  # filled triangle
+#   "LaD-diag"              = 15,  # filled square
+#   "c-post ($\\alpha = 10$)"  = 1,   # open circle
+#   "c-post ($\\alpha = 100$)" = 2,   # open triangle
+#   "Bayes"                    = 0,   # open square
+#   "AIC"                      = 8,   # star
+#   "BIC"                      = 4    # cross
+# )
+
+shape_vals <- c(
+  "LaD-soft"                 = 1,  # open circle
+  "LaD-hard"                 = 2,  # open triangle up
+  "LaD-diag"                 = 0,  # open square
+  "c-post ($\\alpha = 10$)"  = 5,  # open diamond
+  "c-post ($\\alpha = 100$)" = 6,  # open triangle down
+  "Bayes"                    = 13,  # open circle with X
+  "AIC"                      = 4,  # x
+  "BIC"                      = 7   # open rec with X
+)
+
 plot_df <- df_scores_summary %>%
   dplyr::mutate(
     method_chr = as.character(method),
@@ -670,19 +607,10 @@ labels_delta <- setNames(
   delta_values
 )
 
-# hgrid_df <- plot_df %>%
-#   group_by(delta) %>%
-#   summarise(ymax = max(E_brier + SE_brier, na.rm = TRUE), .groups = "drop") %>%
-#   mutate(ymax_half = ceiling(ymax * 2) / 2,                 # round up to next 0.5
-#          y = purrr::map(ymax_half, ~ seq(0, .x, by = 0.5))) %>%
-#   unnest(y) %>%
-#   select(delta, y)
-
 hgrid_df <- plot_df %>% 
   dplyr::group_by(delta) %>% 
   dplyr::summarise(ymin = min(E_brier - SE_brier, na.rm = TRUE), 
-                  ymax = max(E_brier + SE_brier, na.rm = TRUE), 
-                  .groups = "drop" ) %>% 
+                  ymax = max(E_brier + SE_brier, na.rm = TRUE)) %>% 
   dplyr::rowwise() %>% 
   dplyr::mutate(y = list(pretty(c(ymin, ymax), n = 5))) %>% 
   tidyr::unnest(y) %>% 
@@ -692,7 +620,7 @@ pd <- position_dodge(width = 0.7)
 
 vlines_at <- c(1.5, 2.5)
 
-p_metric <- ggplot(plot_df, aes(x = factor(n), y = E_brier, color = method_plot)) +
+p_metric <- ggplot(plot_df, aes(x = factor(n), y = E_brier, color = method_plot, shape = method_plot)) +
   geom_vline(xintercept = vlines_at, linetype = "dashed", color = "grey80", linewidth = 0.7) +
   geom_hline(data = hgrid_df, aes(yintercept = y), color = "grey80", linewidth = 0.3, alpha = 0.3) +
   geom_point(position = pd, size = 2.6) +
@@ -702,8 +630,24 @@ p_metric <- ggplot(plot_df, aes(x = factor(n), y = E_brier, color = method_plot)
     ~ delta, nrow = 1, scales = "free_y",
     labeller = labeller(delta = as_labeller(labels_delta, default = label_parsed))
   ) +
-  scale_color_manual(values = color_vals, limits = method_levels, labels = legend_labels, name = "Method",
-                     guide = guide_legend(nrow = 1, byrow = TRUE, override.aes = list(size = 3))) +
+  scale_color_manual(
+    values = color_vals,
+    limits = method_levels,
+    labels = legend_labels,
+    name   = "Method"
+  ) +
+  scale_shape_manual(
+    values = shape_vals,
+    limits = method_levels,
+    labels = legend_labels,
+    name   = "Method"
+  ) +
+  guides(
+    color = guide_legend(nrow = 1, byrow = TRUE, override.aes = list(size = 3)),
+    shape = guide_legend(nrow = 1, byrow = TRUE, override.aes = list(size = 3))
+  ) +
+  # scale_color_manual(values = color_vals, limits = method_levels, labels = legend_labels, name = "Method",
+  #                    guide = guide_legend(nrow = 1, byrow = TRUE, override.aes = list(size = 3))) +
   # scale_y_continuous(
   #   limits = c(0, NA),            
   #   breaks = scales::breaks_width(0.5),            
@@ -725,30 +669,16 @@ p_metric <- ggplot(plot_df, aes(x = factor(n), y = E_brier, color = method_plot)
     legend.title = element_text(size = 14)
   )
 
-p_metric
-
-
-ggsave("Figures/251111_mvn_metrics.png", p_metric, width = 12, height = 5, dpi = 300)
 
 
 
-
+# save for Figure 4
+# fig_dir <- here::here("output", "figures")
+# ggsave(file.path(fig_dir, "sparseMVN_fig5.png"), p_metric, width = 12, height = 5, dpi = 300)
 
 
 
 
 
 
-KL_for_model <- function(mu_T, S) 0.5 * sum(mu_T[-S]^2)
-
-# Example with your seven models:
-mu_T <- c(1, 1, 0.5, 0.5, 0.4, 0)
-D1 <- KL_for_model(mu_T, c(1,4))
-D2 <- KL_for_model(mu_T, c(1,2))
-D3 <- KL_for_model(mu_T, c(1,2,5))
-D4 <- KL_for_model(mu_T, c(1,2,3))
-D5 <- KL_for_model(mu_T, c(1,2,4))
-D6 <- KL_for_model(mu_T, c(1,2,3,4,5))
-D7 <- KL_for_model(mu_T, 1:6)
-c(D1,D2,D3,D4,D5,D6,D7)
 
