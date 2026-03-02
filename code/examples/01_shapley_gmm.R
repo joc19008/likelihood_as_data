@@ -14,11 +14,11 @@ source(here::here("code","functions.R"))
 
 
 # For exact replication of the figures in the paper, we provide precomputed results in
-# output/shapley_gmm_fitted.RData:
-# load(here::here("output", "shapley_gmm_fitted.RData"))
+# output/shapley_gmm_fitted.Rdata:
+# load(here::here("output", "shapley_gmm_fitted.Rdata"))
 
 
-# Otherwise, the scripts below also allow recomputing the results from the raw data;
+# Otherwise, the scripts below also allow recomputing the results;
 # these may differ slightly due to random initialization in the Gaussian mixture fits, but yield the same qualitative conclusions.
 
 
@@ -41,7 +41,7 @@ n_post_samples <- 1000
 # -------------------------------------------------------------------
 # Fit Gaussian mixtures, build LaD matrix Z, AIC/BIC, LaD posterior
 # -------------------------------------------------------------------
-set.seed(23512)  # for reproducibility of random initializations
+set.seed(9910)  # for reproducibility of random initializations
 
 results_Z <- vector("list", length(sample_sizes))
 results_fits <- vector("list", length(sample_sizes))
@@ -116,8 +116,8 @@ results_Z <- lapply(results_Z,  function(Z) Z[, 1:10])
 
 
 # save results for later reuse 
-# save(results_mu, results_AIC, results_BIC, results_Z, results_fits, x,
-#      file = here::here("output", "shapley_gmm_fitted.RData"))
+save(results_mu, results_AIC, results_BIC, results_Z, results_fits, x,
+     file = here::here("output", "shapley_gmm_fitted.Rdata"))
 
 
 

@@ -1,8 +1,18 @@
 # Robust Model Selection using Likelihood as Data
 
+This repository contains code and data to reproduce the examples in the manuscript *Robust Model Selection using Likelihood as Data*.
+
 ## Software
-R (>= 4.3). Install all required packages with:
-    Rscript -e "install.packages('renv'); renv::restore()"
+
+- R (>= 4.3)
+- Suggested: RStudio
+- Optional (for re-running the Julia mixture fits in Section 5.1): Julia (>= 1.9)
+
+Install all required R packages with:
+
+```sh
+Rscript -e "install.packages('renv'); renv::restore()"
+```
 
 ## Reproducing the analyses
 
@@ -16,20 +26,31 @@ Run the scripts in order from the repo root:
 | `code/examples/04_structure_admixture.R`  | Section S3       | Figure S1    |
 | `code/theory/instability.R`               | Section 4.2      | Figure 2     |
 
-All scripts source `code/functions.R` automatically.
+All scripts source `code/functions.R`.
 Figures are saved to `output/`.
 
 ### Reproducibility notes
 
 - `01_shapley_gmm.R`: For exact replication of the figures in the paper, we provide precomputed results in `output/shapley_gmm_fitted.RData`; 
- recomputing from the raw Shapley data may give slightly different plots due to random initialization in the Gaussian mixture fits, but yield the same qualitative conclusions.
+ recomputing the Gaussian mixture fits from the raw Shapley data may give slightly different plots due to random initialization in the EM / mixture fitting but yields the same qualitative conclusions.
 
+  -- The mixture of finite mixtures (MFM) fitting for the Shapley example are implemented in Julia via the BayesianMixtures.jl package \cite{Miller2018}. 
+  The repository includes precomputed posterior summaries in `data/processed/julia_run/`, which are what the R code uses by default. 
+  Re-running the Julia sampler is optional; if desired, see the Julia code and environment files under `code/julia/` (need to install BayesianMixtures.jl and its dependencies).
+  
 - `02_sparseMVN.R`: For exact replication of the figures in the paper, we provide precomputed results in `output/sparseMVN_fitted.RData`; 
- recomputing the results from the raw data may differ slightly up to random sampling, but yield the same qualitative conclusions.
+ recomputing from the raw data may differ slightly up to random sampling, but again the qualitative conclusions are unchanged.
+
+- `03_tpc.R`: 
+
+- `04_structure_admixture.R`: This script uses precomputed STRUCTURE \cite{Pritchard2000} output stored in `data/processed/structure_run/`. Re-running STRUCTURE from the raw
+Brook Trout data is optional and not required for reproducing the paper’s figures.
 
 
 ## Data sources
-- **Shapley galaxies**: `data/raw/shapley/Shapley_galaxy.dat` Drinkwater et al. (2004), *PASA* 21:89–96 
+All datasets are included here only to facilitate reproduction of the results. Please cite the original sources below if you reuse these data in your own work, and respect their licenses.
+
+- **Shapley galaxies** : `data/raw/shapley/Shapley_galaxy.dat` Drinkwater et al. (2004), *PASA* 21:89–96 
 - **TPC**: `data/raw/tpc/thermal_performance_datasets.csv` Kontopoulos et al. (2024), figshare [doi:10.6084/m9.figshare.24106161.v2](https://doi.org/10.6084/m9.figshare.24106161.v2) **CC-BY 4.0** 
 - **Brook trout**: `data/raw/admixture/brooktrout.txt` (Erdman et al. 2022)
 - **MFM posteriors** (Julia): pre-computed in `data/processed/julia_run/`

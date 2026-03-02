@@ -1,5 +1,5 @@
 # 02_sparseMVN.R
-# Sparse multivariate normal example (Section 5.2.1)
+# Sparse multivariate normal example (Section 5.2)
 
 options(pillar.sigfig = 3)
 
@@ -17,7 +17,7 @@ source(here::here("code", "functions.R"))
 # For exact replication of the figures in the paper, we provide precomputed results in
 # output/sparseMVN_fitted.Rdata:
 # load(here::here("output", "sparseMVN_fitted.Rdata"))
-# After load this, you can jump directly to codes to create Figures below. 
+# After load this, you can jump directly to codes to create figures below. 
 
 # Otherwise, the scripts below also allow recomputing the results from the raw data;
 # these may differ slightly up to random sampling, but yield the same qualitative conclusions.

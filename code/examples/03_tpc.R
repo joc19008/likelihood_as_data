@@ -1,42 +1,5 @@
-# The dataset contains thermal performance measurements across a wide variety of traits and taxon. 
-
-# https://figshare.com/articles/dataset/Data_from_No_model_to_rule_them_all_a_systematic_comparison_of_83_thermal_performance_curve_models_across_traits_and_taxonomic_groups/24106161/3
-# The table include:
-# an id for each thermal performance dataset
-# the organism (taxon column)
-# taxonomy information (kingdom and phylum columns)
-# trait information (trait, broad_trait_group, specific_trait_group columns, if applicable)
-# trait units (trait_unit_SI column)
-# the experimental temperature in °C
-# trait/enzyme measurements (trait_value column)
-# the study from which data were obtained (citation column)
-
-
-# trait = "population growth trait_value" - cannot be straightforwardly linked to the activity of a single trait_value-limiting enzyme and are expected to be better described by phenomenological models whose parameters more accutrait_valuely capture various features of TPC shape. Emergent trait, not directly tied to a single enzyme or mechanistic thermodynamic constraint.
-# Kingdom = "Plantae" or "Chromista" - These include phytoplankton, such as cyanobacteria, diatoms, and green algae.
-# Many temperature points ( >= 8) - we need to fit B(T; theta_k) to {(T_i, y_i)} via MLE. We need enough data to span the full TPC, avoid flat likelihood surfaces, reduce uncertainty in MLE -- robust param. estiamtes require the model to be identified 
-# Trait values vary with temperature - to ensure identifiable TPCs. 
-
-# Model                   | Type              | Params  | Notes
-# Gaussian                | Phenomenological  | 3       | Simple, symmetric baseline
-# Mitchell–Angilletta     | Phenomenological  | 3       | Well-performing cosine-based model
-# Atkin                   | Phenomenological  | 3       | Well-performing exponential trait_value
-# Brière I                | Phenomenological  | 3       | Asymmetric with theoretical grounding
-# Eubank                  | Phenomenological  | 3       | Often performs well, rational function form
-# Second-order Polynomial | Phenomenological  | 3       | Flexible, low complexity
-# Weibull                 | Phenomenological  | 4
-# Johnson–Lewin           | Mechanistic       | 4       | Classic enzyme kinetic model
-# Extended Brière         | Phenomenological  | 5
-
-# Prorocentrum minimum is a well-studied species of phytoplankton. Specifically: Kingdom: Chromista, Phylum: Myzozoa (formerly Dinoflagellata in some classifications), Class: Dinophyceae, Common grouping: Dinoflagellate phytoplankton
-
-# For thermal performance studies., P. minimum shows strong temperature sensitivity in its growth rate
-
-# The dataset from Grzebyk & Berland (1996) includes repeated measurements across a wide range of temperatures, with replication.
-
-# From the thermal performance database of Kontopoulos et al.,
-# we selected the dataset with the largest sample size for the taxon Prorocentrum minimum and the trait “growth rate.”
-
+# 03_tpc.R
+# Thermal performance curves in microbial ecology (Section 5.3)
 
 library(tidyverse)
 library(ggplot2)
@@ -44,16 +7,20 @@ library(nls.multstart)
 library(minpack.lm)
 library(purrr)
 library(cowplot)
+library(here)
 
-seed <- 251111
-set.seed(seed)
+source(here::here("code", "functions.R"))
 
-dat.all <- read.csv("Data/thermal_performance_datasets.csv")
 
-dat.all %>%
-  filter(trait %in% c("Growth rate", "growth rate")) %>%
-  count(taxon, sort = TRUE) %>%
-  slice_max(n, n = 10) 
+# Read data
+dat.all <- read_csv(
+  here::here("data", "raw", "tpc", "thermal_performance_datasets.csv")
+)
+
+# dat.all %>%
+#   filter(trait %in% c("Growth rate", "growth rate")) %>%
+#   count(taxon, sort = TRUE) %>%
+#   slice_max(n, n = 10) 
 
 pm_dat <- dat.all |>
   filter(taxon == "Prorocentrum minimum",
@@ -62,13 +29,27 @@ pm_dat <- dat.all |>
   select(temperature, trait_value) %>%
   rename(temp = temperature) 
 
-ggplot(pm_dat, aes(x = temp, y = trait_value)) +
-  geom_point() +
-  geom_smooth(se = FALSE, method = "loess") +
-  labs(title = "pm minor: Population Growth vs Temperature",
-       x = "Temperature (°C)",
-       y = "Population Growth rate")
+# ggplot(pm_dat, aes(x = temp, y = trait_value)) +
+#   geom_point() +
+#   geom_smooth(se = FALSE, method = "loess") +
+#   labs(title = "pm minor: Population Growth vs Temperature",
+#        x = "Temperature (°C)",
+#        y = "Population Growth rate")
 
+
+
+
+# For exact replication of the figures in the paper, we provide precomputed results in
+# output/tpc_fitted.Rdata:
+# load(here::here("output", "tpc_fitted.Rdata"))
+
+# Otherwise, the scripts below also allow recomputing the results from the raw data;
+# these may differ slightly up to random sampling, but yield the same qualitative conclusions.
+
+
+
+
+set.seed(251111)
 
 
 # Models
@@ -427,9 +408,7 @@ names(fit_list) <- c(
   "Extended Brière","Poly-5","Sharpe–Schoolfield"
 )
 
-
-# save(fit_list, file = paste("Output/251111_tpc_seed_", seed, ".Rdata", sep=""))
-
+# save(fit_list, file = paste("output/tpc_fitted"))
 
 
 model_labels <- c(
@@ -472,7 +451,7 @@ curve_df_plot$model <- factor(curve_df_plot$model,
 tpc_fit <- ggplot(pm_dat_plot, aes(x = temp, y = trait_value_divd)) +
   geom_point(color = "black", size=0.5) +
   geom_line(data = curve_df_plot, aes(x = temp, y = fitted_divd), 
-            color = "steelblue3", size = 1) +   # same color for all lines
+            color = "steelblue3", size = 1) +   
   facet_wrap(~ model, scales = "free") +
   labs(
     x = "Temperature (°C)",
@@ -489,10 +468,6 @@ tpc_fit <- ggplot(pm_dat_plot, aes(x = temp, y = trait_value_divd)) +
     legend.position = "none"
   )
 
-tpc_fit
-
-
-# ggsave("Figures/250914_tpc_fit.png", tpc_fit, width = 8, height = 6, dpi = 300, device = "png")
 
 
 
@@ -521,7 +496,7 @@ complexities <- c(3,3,3,3,4,4,5,6,7)
 df_k <- complexities + 1
 n <- nrow(pm_dat)
 
-Z <- t(t(Z) + df_k/(2*n)) # Bias-adjusted
+Z_bc <- t(t(Z) + df_k/(2*n)) # Bias-adjusted
 
 
 # Noise (baseline) model
@@ -546,10 +521,10 @@ sigma2_hat <- with(proxy_fit, mean((trait_value - mu_hat)^2))
 proxy_fit <- proxy_fit %>%
   mutate(g_proxy = 0.5 * (log(2*pi*sigma2_hat) + (trait_value - mu_hat)^2 / sigma2_hat))
 
-mu_star <- mean(proxy_fit$g_proxy)
+mu_flex <- mean(proxy_fit$g_proxy)
 
 
-K <- length(colnames(Z))
+K <- length(colnames(Z_bc))
 # NIW Prior Parameters
 mu0 <- rep(0, K)       # Prior mean (vector of zeros).
 lambda0 <- 0.01        # Prior scaling for the mean.
@@ -557,26 +532,25 @@ nu0 <- K + 2           # Degrees of freedom (must be > K-1).
 Psi0 <- 1 * diag(K)  # Prior inverse scale matrix.
 
 n_post_samples <- 1000
-mu_samples <- niw_posterior(Z, mu0, lambda0, Psi0, nu0, n_post_samples)$mu # NIW bayesian inference
+mu_samples <- niw_posterior(Z_bc, mu0, lambda0, Psi0, nu0, n_post_samples)$mu # NIW bayesian inference
 
 
 
-# Choosing gamma and delta
-# gamma <- c(0.001, 0.02, 0.05, 0.1, 0.2, 0.25)  # % tolerance
-gamma <- c(0.25, 0.1, 0.05, 0.001)  
-delta_values <- gamma * (mu_noise - mu_star)
+# Choosing tau and delta
+tau <- c(0.25, 0.1, 0.05, 0.001)  
+delta_values <- tau * (mu_noise - mu_flex)
 
 all_results <- list()
 for (i in seq_along(delta_values)) {
   delta <- delta_values[i]
-  gamma_i <- gamma[i]
+  tau_i <- tau[i]
   sel_probs <- selection_probabilities(mu_samples, complexities, delta, alpha_n = n^(0.45))
   all_results[[i]] <- data.frame(
-    model = colnames(Z),
+    model = colnames(Z_bc),
     complexity = complexities,
     sel_prob = sel_probs,
     delta = delta,
-    gamma = gamma_i
+    tau = tau_i
   )
 }
 
@@ -586,13 +560,10 @@ final_results <- do.call(rbind, all_results)  %>%
     k = as.integer(model)
   ) 
 
-
-
 delta_palette <- c("orange", "purple1", "green3", "steelblue3")
 plot_results <- final_results %>%
   mutate(
-    model = factor(model, levels = colnames(Z), labels = colnames(Z)),
-    # facet_label = paste0("paste(delta==", round(delta, 3), ", \"; \", gamma==", round(gamma, 3), ")")
+    model = factor(model, levels = colnames(Z_bc), labels = colnames(Z_bc)),
     facet_label = paste0("paste(delta==", round(delta, 3), ")")
   ) %>%
   mutate(delta_f = factor(signif(delta, 3), levels = unique(signif(delta, 3))))
@@ -622,15 +593,10 @@ tpc_plot <- ggplot(plot_results, aes(x = factor(k), y = sel_prob, fill = delta_f
     axis.text  = element_text(size = 18),
     axis.title.y = element_text(angle = 0, vjust = 0.5)
   )
-tpc_plot
-
-# ggsave("Figures/250914_tpc_lad_bar.png", tpc_plot, width = 8, height = 6, dpi = 300, device = "png")
-
 
 
 
 # Mu plot
-
 S <- nrow(mu_samples); K <- ncol(mu_samples)
 colnames(mu_samples) <- paste0("k", seq_len(K))
 
@@ -651,29 +617,12 @@ df_mu_long <- df_mu %>%
 K_max <- K
 ygrid_mu <- pretty(range(df_mu_long$mu_sample, na.rm = TRUE), n = 6)
 
-# p_mu <- ggplot(df_mu_long, aes(x = factor(k), y = mu_sample)) +
-#   geom_boxplot(width = 0.6, outlier.size = 0.3, color = "black", fill = "white") +
-#   geom_vline(xintercept = seq(1, K_max, by = 1), color = "grey70", linewidth = 0.2, alpha = 0.3) +
-#   geom_hline(yintercept = ygrid_mu,                       color = "grey70", linewidth = 0.2, alpha = 0.3) +
-#   scale_y_continuous(limits = range(ygrid_mu), breaks = ygrid_mu) +
-#   labs(x = "k", y = expression(mu[k])) +
-#   theme_bw(base_size = 20) +
-#   theme(
-#     panel.grid = element_blank(),
-#     strip.background = element_rect(fill = "white", color = "black"),
-#     axis.title = element_text(size = 18),
-#     axis.text  = element_text(size = 15),
-#     axis.title.y = element_text(angle = 0, vjust = 0.5, margin = margin(r = 5))
-#   )
-# p_mu
-
-
 
 df_centered <- df_mu_long %>%
   group_by(draw) %>%
-  mutate(mu_star = min(mu_sample, na.rm = TRUE)) %>%
+  mutate(mu_flex = min(mu_sample, na.rm = TRUE)) %>%
   ungroup() %>%
-  mutate(mu_diff = mu_sample - mu_star)
+  mutate(mu_diff = mu_sample - mu_flex)
 
 
 delta_df <- NULL
@@ -704,7 +653,6 @@ p_qoi <- ggplot(df_centered, aes(x = factor(k), y = mu_diff)) +
     axis.text  = element_text(size = 18),
     axis.title.y = element_text(angle = 0, vjust = 0.5, margin = margin(r = 5))
   )
-p_qoi
 
 
 spacer <- ggplot() + theme_void()
@@ -717,8 +665,6 @@ fig.tpc.1 <- plot_grid(
   label_size = 22, label_fontface = "bold",
   label_x = -0.01, label_y = 1
 )
-fig.tpc.1
-
 
 
 fig.tpc <- plot_grid(
@@ -729,11 +675,10 @@ fig.tpc <- plot_grid(
   label_x = 0.01, label_y = 1
 )
 
-fig.tpc
 
-
-ggsave("Figures/251111_tpc_result.png", fig.tpc, width = 15, height = 10, dpi = 300)
-# ggsave("Figures/251021_tpc_p_mu.png", p_mu, width = 8, height = 5, dpi = 300)
+# save for Figure 6
+# fig_dir <- here::here("output", "figures")
+# ggsave(file.path(fig_dir, "tpc_fig6.png"), fig.tpc, width = 15, height = 10, dpi = 300)
 
 
 
