@@ -408,7 +408,8 @@ names(fit_list) <- c(
   "Extended Brière","Poly-5","Sharpe–Schoolfield"
 )
 
-# save(fit_list, file = paste("output/tpc_fitted"))
+
+# save(fit_list, file = paste("output/tpc_fitted.Rdata"))
 
 
 model_labels <- c(

@@ -1,9 +1,16 @@
+# 04_structure_admixture.R
+# Population structure admixture models (Section 5.4)
+
 library(matrixStats) 
 library(dplyr)
 library(purrr)
 library(tidyr)
 library(gridExtra)
 library(ggplot2)
+library(cowplot)
+
+source(here::here("code", "functions.R"))
+
 
 # ----------------------------
 # Parse STRUCTURE output
@@ -169,94 +176,26 @@ compute_point_nll <- function(X, alpha, theta, labels, S = 1000, eps = 1e-12, au
   data.frame(ind = seq_len(n), nll = nll)
 }
 
-# Function to draw posterior samples of mu and Sigma using NIW conjugacy
-niw_posterior <- function(Z, mu0, lambda0, Psi0, nu0, n_samples) {
-  n <- nrow(Z)
-  K <- ncol(Z)
-  
-  # Compute sufficient statistics
-  Z_bar <- colMeans(Z)
-  Psi_obs <- t(Z - matrix(Z_bar, n, K, byrow = TRUE)) %*% (Z - matrix(Z_bar, n, K, byrow = TRUE))
-  
-  # Update posterior parameters
-  lambda_n <- lambda0 + n
-  mu_n <- (lambda0*mu0 + n*Z_bar)/lambda_n
-  nu_n <- nu0 + n
-  Psi_n <- Psi0 + Psi_obs + (lambda0*n/lambda_n)*(matrix(Z_bar-mu0, ncol=1) %*% matrix(Z_bar-mu0, nrow=1))
-  
-  mu_samples <- matrix(NA, nrow = n_samples, ncol = K)
-  Sigma_samples <- array(NA, dim = c(K, K, n_samples))
-  
-  # Draw posterior samples
-  for (i in 1:n_samples) {
-    # Sample Sigma from the Inverse-Wishart distribution
-    # Sigma <- solve(rwish(nu_n, solve(Psi_n)))
-    Sigma <- MCMCpack::riwish(nu_n, Psi_n)
-    
-    # Sample mu from the conditional Normal distribution given Sigma
-    mu <- mvtnorm::rmvnorm(1, mu_n, Sigma/lambda_n)
-    # mu <- mvrnorm(1, mu_n, Sigma / lambda_n)
-    
-    mu_samples[i, ] <- mu
-    Sigma_samples[, , i] <- Sigma
-  }
-  
-  return(list(mu = mu_samples, Sigma = Sigma_samples))
-}
 
+# Read Data
+dat <- read.table(
+  here::here("data", "raw", "admixture", "brooktrout.txt")
+)
 
-# Selection probaiblity function
-selection_probabilities <- function(mu_samples, complexities, delta, alpha_n) {
-  # mu_samples: S x K matrix of posterior draws for mu_k (e.g., negative log-likelihood)
-  # complexities: integer vector of length K specifying the complexity class for each model
-  # delta: numeric tolerance for "surviving" from the global best
-  # alpha_n: temperature parameter (positive)
-  
-  S <- nrow(mu_samples)  # number of posterior draws
-  K <- ncol(mu_samples)  # number of models
-  
-  class_selection_counts <- numeric(K) # Class selection indicator counts
-  weight_sums <- numeric(K) # Sum of performance weights
-  
-  for (s in seq_len(S)) {
-    mu_draw <- mu_samples[s, ]
-    
-    # Step 1: Determine the chosen complexity class for this draw
-    overall_best <- min(mu_draw)
-    surviving <- which(mu_draw <= overall_best + delta)
-    surviving_classes <- complexities[surviving]
-    chosen_class <- min(surviving_classes)
-    
-    selected_models <- which(complexities == chosen_class)
-    class_selection_counts[selected_models] <- class_selection_counts[selected_models] + 1
-    
-    # Step 2: Compute the weight.
-    for (k in seq_len(K)) {
-      class_k <- complexities[k]
-      models_in_class <- which(complexities == class_k)
-      mu_best_in_class <- min(mu_draw[models_in_class])
-      weight <- exp(-alpha_n * (mu_draw[k] - mu_best_in_class))
-      weight_sums[k] <- weight_sums[k] + weight
-    }
-  }
-  
-  # Compute the Monte Carlo estimates by averaging over S draws:
-  p_class <- class_selection_counts / S
-  avg_weight <- weight_sums / S
-  
-  # Overall model selection probability: product of the two components.
-  final_probs <- p_class * avg_weight
-  return(final_probs)
-}
-
-seed <- 251111
-set.seed(seed)
-
-# data
-# dat <- read.table("Data/impala.txt")
-dat <- read.table("Data/brooktrout.txt")
 X <- dat
-# X_mat <- as.matrix(dat)
+
+
+# For exact replication of the figures in the paper, we provide precomputed results in
+# output/admixture_fitted.Rdata:
+# load(here::here("output", "admixture_fitted.Rdata"))
+
+# Otherwise, the scripts below also allow recomputing the results;
+# these may differ slightly up to random sampling, but yield the same qualitative conclusions.
+
+
+
+
+set.seed(251111)
 
 grid <- expand.grid(
   K = 1:10,
@@ -264,13 +203,13 @@ grid <- expand.grid(
 ) %>%
   as_tibble() %>%
   mutate(
-    file = sprintf("Structure/250914_output/results_K%d_rep%d_f", K, rep)
+    file = here::here("data", "processed", "structure_run",
+                      sprintf("results_K%d_rep%d_f", K, rep))
   )
 
 results <- grid %>%
   mutate(
     parsed = map2(file, K, parse_structure_results),
-    # mean_ll = map_dbl(parsed, "mean_ln_likelihood")
     mean_ll = map_dbl(parsed, "estimated_ln_prob")
   ) %>%
   dplyr::select(K, rep, mean_ll)
@@ -279,7 +218,9 @@ best_reps <- results %>%
   group_by(K) %>%
   slice_max(mean_ll, n = 1, with_ties = FALSE) %>%
   ungroup() %>%
-  mutate(file = sprintf("Structure/250914_output/results_K%d_rep%d_f", K, rep))
+  mutate(file = here::here("data", "processed", "structure_run",
+                           sprintf("results_K%d_rep%d_f", K, rep))
+         )
 
 final_rep_nll <- best_reps %>%
   mutate(parsed = map2(file, K, parse_structure_results)) %>%
@@ -291,15 +232,16 @@ final_nll <- final_rep_nll %>% dplyr::select(-rep)
 
 
 
+# save(final_nll, file = paste("output/admixture_fitted.Rdata"))
+
+
+
 ## Apply LaD
 nll_matrix <- final_nll %>%
-  # filter(K %in% c(1:10)) %>%
   pivot_wider(names_from = K, values_from = nll) %>%
   arrange(ind)
 
 Z <- as.matrix(nll_matrix[,-1]) # remove index column 
-
-
 K <- length(colnames(Z))
 n <-nrow(Z)
 complexities <- c(1,2,3,4,5,6,7,8,9,10)
@@ -311,10 +253,8 @@ V_l <- sapply(seq_len(L), function(l) {
 })
 
 Ks <- seq_len(ncol(Z))
-
 d_k <- Ks * sum(V_l - 1) + Ks
-
-Z  <- t(t(Z) + d_k/(2*n))  # bias-corrected. 
+Z_bc  <- t(t(Z) + d_k/(2*n))  # bias-corrected. 
 
 
 
@@ -324,8 +264,8 @@ nll_noise <- as.vector(M %*% log(V_l))
 mu_noise_uniform <- mean(nll_noise)
 print(mu_noise_uniform )
 
-# mu_noise <- as.numeric(colMeans(Z)[1])
-mu_k <- as.numeric(colMeans(Z))
+# mu_noise <- as.numeric(colMeans(Z_bc)[1])
+mu_k <- as.numeric(colMeans(Z_bc))
 print(mu_k)
 
 # NIW Prior Parameters
@@ -335,7 +275,7 @@ nu0 <- K + 2  # Degrees of freedom (must be > K-1).
 Psi0 <- 1 * diag(K)  # Prior inverse scale matrix.
 
 n_post_samples <- 1000
-mu_samples <- niw_posterior(Z, mu0, lambda0, Psi0, nu0, n_post_samples)$mu # NIW bayesian inference
+mu_samples <- niw_posterior(Z_bc, mu0, lambda0, Psi0, nu0, n_post_samples)$mu 
 
 
 
@@ -407,16 +347,9 @@ p_heat <- ggplot() +
     plot.margin = margin(5, 5, 5, 5) 
   )  
 
-p_heat
-
-# ggsave("Figures/250915_brooktrout_lad_pp.png", p_heat, width = 6, height = 4, dpi = 300, device = "png")
-
-
 
 
 # Mu plot
-
-
 S <- nrow(mu_samples); K <- ncol(mu_samples)
 colnames(mu_samples) <- paste0("k", seq_len(K))
 
@@ -452,18 +385,12 @@ p_mu <- ggplot(df_mu_long, aes(x = factor(k), y = mu_sample)) +
     axis.text  = element_text(size = 15),
     axis.title.y = element_text(angle = 0, vjust = 0.5, margin = margin(r = 5))
   )
-p_mu
 
-
-
-library(cowplot)
 fig.ad <- plot_grid(
   p_mu, p_heat,
   ncol = 2, align = "v", axis = "l",
   rel_widths = c(1, 1.2) 
 )
-fig.ad
-
 
 
 
@@ -608,13 +535,9 @@ pD <- ggplot(evanno_df, aes(K, DeltaK)) +
 evanno_plot <- grid.arrange(pA, pB, pD, ncol = 3)
 
 
-
-
-ggsave("Figures/260225_brooktrout_result.png", fig.ad, width = 15, height = 5, dpi = 300)
-
-ggsave("Figures/251111_brooktrout_evanno.png", evanno_plot, width = 15, height = 5, dpi = 300, device = "png")
-
-
-save.image("admixture_251111.RData") 
+# save for Figure S1 and S2
+# fig_dir <- here::here("output", "figures")
+ggsave(file.path(fig_dir, "admixture_figS1.png"), fig.ad, width = 15, height = 5, dpi = 300)
+ggsave(file.path(fig_dir, "admixture_figS2.png"), evanno_plot, width = 15, height = 5, dpi = 300)
 
 
