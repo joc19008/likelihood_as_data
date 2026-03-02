@@ -21,17 +21,19 @@ Figures are saved to `output/`.
 
 ### Reproducibility notes
 
-- `01_shapley_gmm.R`: For exact replication of the figures in the paper, we provide precomputed results in `output/shapley_gmm.RData`; 
+- `01_shapley_gmm.R`: For exact replication of the figures in the paper, we provide precomputed results in `output/shapley_gmm_fitted.RData`; 
  recomputing from the raw Shapley data may give slightly different plots due to random initialization in the Gaussian mixture fits, but yield the same qualitative conclusions.
+
+- `02_sparseMVN.R`: For exact replication of the figures in the paper, we provide precomputed results in `output/sparseMVN_fitted.RData`; 
+ recomputing the results from the raw data may differ slightly up to random sampling, but yield the same qualitative conclusions.
 
 
 ## Data sources
-- **Shapley galaxies**: `data/raw/shapley/Shapley_galaxy.dat` (Drinkwater et al. 2004)
-- **TPC**: `data/raw/tpc/thermal_performance_datasets.csv` (Kontopoulos et al. 2024, CC-BY-4.0)
+- **Shapley galaxies**: `data/raw/shapley/Shapley_galaxy.dat` Drinkwater et al. (2004), *PASA* 21:89–96 
+- **TPC**: `data/raw/tpc/thermal_performance_datasets.csv` Kontopoulos et al. (2024), figshare [doi:10.6084/m9.figshare.24106161.v2](https://doi.org/10.6084/m9.figshare.24106161.v2) **CC-BY 4.0** 
 - **Brook trout**: `data/raw/admixture/brooktrout.txt` (Erdman et al. 2022)
 - **MFM posteriors** (Julia): pre-computed in `data/processed/julia_run/`
 - **STRUCTURE runs**: pre-computed in `data/processed/structure_run/`
-
 
 
 JASA Reproducibility Materials Template

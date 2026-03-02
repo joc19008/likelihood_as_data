@@ -16,7 +16,7 @@ source(here::here("code", "functions.R"))
 
 # For exact replication of the figures in the paper, we provide precomputed results in
 # output/sparseMVN_fitted.Rdata:
-load(here::here("output", "sparseMVN_fitted.Rdata"))
+# load(here::here("output", "sparseMVN_fitted.Rdata"))
 # After load this, you can jump directly to codes to create Figures below. 
 
 # Otherwise, the scripts below also allow recomputing the results from the raw data;
