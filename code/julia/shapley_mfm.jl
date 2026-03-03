@@ -3,23 +3,30 @@ using BayesianMixtures
 const B = BayesianMixtures
 using DelimitedFiles, Statistics, Printf, Random
 
+# Paths relative to the repo root
+const ROOT = normpath(joinpath(@__DIR__, "..", ".."))
+const DATA_IN  = joinpath(ROOT, "data", "raw", "shapley")
+const DATA_OUT = joinpath(ROOT, "data", "processed", "julia_run", "MFM")
+
+mkpath(DATA_OUT)  # make sure output dir exists
+
 # --------------------- Data ---------------------
-raw = readdlm("Shapley_galaxy.dat")
-x_all = vec(raw[:,4]) ./ 1000.0          # 10^3 km/s
-cut = quantile(x_all, 0.995)             # trim top 0.5%
+raw = readdlm(joinpath(DATA_IN, "Shapley_galaxy.dat"))
+x_all = vec(raw[:, 4]) ./ 1000.0
+cut = quantile(x_all, 0.995) # trim top 0.5%
 x_all = x_all[x_all .<= cut]
 nmax = length(x_all)
 # sample_sizes = [40, 50, 100, 200, 400, 500, 1000, 2000, 4000, nmax]
 sample_sizes = [40, 120, 400, 1200, 4000]
 
 # Randomly permute once, so subsets are nested but random
-seed    = 20251014
+seed = 20251014
 Random.seed!(seed)
 
 perm = randperm(nmax)
 x_perm = x_all[perm]
 
-open("Output/251014_x_perm.csv", "w") do io
+open(joinpath(DATA_OUT, "x_perm.csv"), "w") do io
     println(io, "x_perm")
     for val in x_perm
         @printf(io, "%.10f\n", val)
@@ -39,9 +46,6 @@ n_keep  = n_total - n_burn
 
 k_max = 30
 
-# Output
-outdir = "Output/251215_MFM"
-isdir(outdir) || mkpath(outdir)
 
 # --------------------- Main loop ---------------------
 for n in sample_sizes
@@ -50,13 +54,13 @@ for n in sample_sizes
 
     opt = B.options(
         "Normal", "MFM", x_n, n_total;
-        n_keep          = n_keep,
-        n_burn          = n_burn,
-        verbose         = true,
-        use_hyperprior  = true,
-        t_max           = t_max_cap,
-        gamma           = gamma_dir,
-        log_pk          = log_pk_str
+        n_keep = n_keep,
+        n_burn = n_burn,
+        verbose = true,
+        use_hyperprior = true,
+        t_max = t_max_cap,
+        gamma = gamma_dir,
+        log_pk = log_pk_str
     )
 
     res = B.run_sampler(opt)
@@ -69,7 +73,7 @@ for n in sample_sizes
         ks, pk = ks[1:last_nz], pk[1:last_nz]
     end
 
-    prefix = joinpath(outdir, @sprintf("mfm_n%05d", n))
+    prefix = joinpath(DATA_OUT, "shapley_mfm_n$(n)")
 
     open(prefix * "_k_posterior.csv", "w") do io
         println(io, "k,prob")
@@ -79,10 +83,8 @@ for n in sample_sizes
     end
 
     # --------------------- Posterior draws of K (for boxplots) ---------------------
-    # convert t-draws -> K-draws by sampling K | t
-
     # Use post–burn-in draws of t (# occupied clusters)
-    iters   = (n_burn+1):n_total
+    iters = (n_burn+1):n_total
     t_draws = @view res.t[iters]
 
     # under prior support K<=30, we should never see t > 30
@@ -100,8 +102,7 @@ for n in sample_sizes
         K_draws[idx] = B.rand_categorical(view(p_kt, :, tt))
     end
 
-
-    # Write genuine posterior draws of K 
+    # Write posterior draws of K 
     open(prefix * "_k_draws.csv", "w") do io
         println(io, "iteration,K")
         for (i, kk) in zip(iters, K_draws)
