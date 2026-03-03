@@ -1,22 +1,26 @@
 # Robust Model Selection using Likelihood as Data
 
-This repository contains code and data to reproduce the examples in the manuscript *Robust Model Selection using Likelihood as Data*.
+This repository contains all code and data needed to reproduce the analyses, figures, and tables in the manuscript *Robust Model Selection using Likelihood as Data* ([arXiv](https://arxiv.org/abs/2602.23355)).
 
-## Software
+---
 
-- R (>= 4.3)
-- Suggested: RStudio
-- Optional (for re-running the Julia mixture fits in Section 5.1): Julia (>= 1.9)
 
-Install all required R packages with:
+## Software requirements
 
-```sh
+- **R (≥ 4.3)** is required. We use `renv` to capture the exact package environment. To install all required packages, run from the repository root:
+
+```r
 Rscript -e "install.packages('renv'); renv::restore()"
 ```
 
+- **Julia (≥ 1.9)** — optional; needed only to re-run the MFM posterior sampler (see below).
+- **STRUCTURE 2.3.4** — optional; needed only to re-run the admixture analysis (see below).
+
+---
+
 ## Reproducing the analyses
 
-Run the scripts in order from the repo root:
+All scripts source `code/functions.R`, which contains the core LaD functions. Run each script from the repository root in R or RStudio.
 
 | Script | Paper section | Output |
 |--------|---------------|--------|
@@ -26,196 +30,91 @@ Run the scripts in order from the repo root:
 | `code/examples/04_structure_admixture.R`  | Section S3       | Figure S1    |
 | `code/theory/instability.R`               | Section 4.2      | Figure 2     |
 
-All scripts source `code/functions.R`.
-Figures are saved to `output/`.
+All figures are saved to `output/`.
+
 
 ### Reproducibility notes
 
-- `01_shapley_gmm.R`: For exact replication of the figures in the paper, we provide precomputed results in `output/shapley_gmm_fitted.RData`; 
- recomputing the Gaussian mixture fits from the raw Shapley data may give slightly different plots due to random initialization in the EM / mixture fitting but yields the same qualitative conclusions.
+Precomputed results are provided in `output/` for scripts that involve random initialization or Monte Carlo sampling, so loading these files produces figures identical to those in the paper. Results may differ slightly if re-run from scratch, but qualitative conclusions are unchanged. Specific notes per script:
 
-  -- The mixture of finite mixtures (MFM) fitting for the Shapley example are implemented in Julia via the BayesianMixtures.jl package \cite{Miller2018}. 
-  The repository includes precomputed posterior summaries in `data/processed/julia_run/`, which are what the R code uses by default. 
-  Re-running the Julia sampler is optional; if desired, see the Julia code and environment files under `code/julia/` (need to install BayesianMixtures.jl and its dependencies).
-  
-- `02_sparseMVN.R`: For exact replication of the figures in the paper, we provide precomputed results in `output/sparseMVN_fitted.RData`; 
- recomputing from the raw data may differ slightly up to random sampling, but again the qualitative conclusions are unchanged.
+- **`01_shapley_gmm.R`**: Precomputed fits in `output/shapley_gmm_fitted.RData` (Gaussian mixture EM across sample sizes). The MFM posterior uses precomputed Julia output from `data/processed/julia_run/`.
+- **`02_sparseMVN.R`**: Precomputed results in `output/sparseMVN_fitted.RData`.
+- **`03_tpc.R`**: Precomputed model fits in `output/tpc_fitted.RData`.
+- **`04_structure_admixture.R`**: Uses precomputed STRUCTURE output in `data/processed/structure_run/`.
 
-- `03_tpc.R`: 
+---
 
-- `04_structure_admixture.R`: This script uses precomputed STRUCTURE \cite{Pritchard2000} output stored in `data/processed/structure_run/`. Re-running STRUCTURE from the raw
-Brook Trout data is optional and not required for reproducing the paper’s figures.
+### Julia (optional)
+
+The MFM posterior was computed using [BayesianMixtures.jl](https://github.com/jwmi/BayesianMixtures.jl) (Miller & Harrison 2018). Precomputed summaries are in `data/processed/julia_run/`, so Julia is not required to reproduce the figures. To re-run the sampler:
+
+1. Install Julia from [julialang.org](https://julialang.org/downloads/)
+2. Install BayesianMixtures.jl:
+   ```julia
+   using Pkg; Pkg.add(url="https://github.com/jwmi/BayesianMixtures.jl")
+   ```
+3. See `code/julia/` for the sampler script and environment files.
+
+---
+
+
+### STRUCTURE (optional)
+
+The admixture example (Section S3) uses precomputed STRUCTURE 2.3.4 output in `data/processed/structure_run/`. To re-run from scratch:
+
+**Software**
+- STRUCTURE 2.3.4 — download from [pritchardlab.stanford.edu](https://web.stanford.edu/group/pritchardlab/structure.html)
+- Binary location: `./structure` (or on PATH)
+
+**Inputs**
+- Parameter files: `code/structure/mainparams`, `code/structure/extraparams`
+- Genotype file: `data/raw/admixture/brooktrout.txt` (ensure `mainparams` points to this file)
+
+**Outputs**
+- Written to: `data/processed/structure_run/`
+- Naming convention: `results_K{K}_rep{rep}` (plus STRUCTURE suffixes)
+
+**Command**
+```bash
+mkdir -p data/processed/structure_run
+for K in {1..10}; do
+  for rep in {1..20}; do
+    SEED=$((1000 * K + rep))
+    ./structure \
+      -K $K \
+      -D $SEED \
+      -m code/structure/mainparams \
+      -e code/structure/extraparams \
+      -o data/processed/structure_run/results_K${K}_rep${rep}
+  done
+done
+```
+
+---
 
 
 ## Data sources
-All datasets are included here only to facilitate reproduction of the results. Please cite the original sources below if you reuse these data in your own work, and respect their licenses.
 
-- **Shapley galaxies** : `data/raw/shapley/Shapley_galaxy.dat` Drinkwater et al. (2004), *PASA* 21:89–96 
-- **TPC**: `data/raw/tpc/thermal_performance_datasets.csv` Kontopoulos et al. (2024), figshare [doi:10.6084/m9.figshare.24106161.v2](https://doi.org/10.6084/m9.figshare.24106161.v2) **CC-BY 4.0** 
-- **Brook trout**: `data/raw/admixture/brooktrout.txt` (Erdman et al. 2022)
-- **MFM posteriors** (Julia): pre-computed in `data/processed/julia_run/`
-- **STRUCTURE runs**: pre-computed in `data/processed/structure_run/`
+All datasets are included to facilitate reproduction of the results. Please cite the original sources if you reuse these data, and respect their licenses.
 
+| Dataset | File | Source | License |
+|---------|------|--------|---------|
+| Shapley galaxy radial velocities | `data/raw/shapley/Shapley_galaxy.dat` | Drinkwater et al. (2004) | No restrictions; please cite source |
+| *P. minimum* growth rates | `data/raw/tpc/thermal_performance_datasets.csv` | Kontopoulos et al. (2024), Figshare [doi:10.6084/m9.figshare.24106161.v2](https://doi.org/10.6084/m9.figshare.24106161.v2) | **CC BY 4.0** |
+| Brook trout microsatellite genotypes | `data/raw/admixture/brooktrout.txt` | Erdman et al. (2022); data: [USGS ScienceBase](https://www.sciencebase.gov/catalog/item/611d264cd34e40dd9c01284e) | **U.S. public domain** (USGS data release) |
 
-JASA Reproducibility Materials Template
-================
-
-This GitHub repository contains a suggested template structure for authors who
-submit to JASA (either Applications and Case Studies or Theory and
-Methods) to include materials to reproduce analyses, visualizations, and
-tables.
-
-We provide this template as a default structure that we (the JASA Associate Editors of Reproducibility) think could be
-useful for many projects, either as is or with modifications by authors.
-However, the template is intended to be helpful and is by no means
-required of authors. Authors should consult [our reproducibility
-guide](https://jasa-acs.github.io/repro-guide) for details on what is
-required of reproducibility materials submitted with JASA revisions (not
-required upon initial submission).
-
-## Why is a template repository useful?
-
-The purpose of this template repository is to provide a mechanism for
-author(s) to share their materials via a Git repository, hosted on a
-cloud-based repository manager such as GitHub or GitLab. This provides
-the following advantages for author(s):
-
-1.  Analyses (including code, narrative text, output, plots, etc) can be
-    version controlled (or branched or forked) allowing original
-    author(s) to continue to develop the analyses or other data analysts
-    to build off the analyses. Also iterations and changes to the
-    analysis are then available via the Git commit history.
-2.  Materials are easily available to other researchers.
-3.  Preparing a repository also makes it easy for the JASA Associate
-    Editors for Reproducibility to copy the materials for a JASA article
-    into the JASA GitHub repository where the final paper products are stored
-    after publication (https://github.com/jasa-acs).
-
-## How does the process work?
-
-### Step 1
-
-Author(s) can create a public GitHub repository in their own GitHub account
-by using this template repository. This template contains a basic 
-skeletal structure to help authors structure their code and analyses for their 
-JASA publication. Creating a repository with the template can be done in the following way: 
-
-Click on the "Use this template" button for [this GitHub template repository](https://github.com/jasa-acs/repro-template). (You'll need to be signed in to a GitHub account in order to see the button.)
-
-![Click template button](https://docs.github.com/assets/cb-36544/images/help/repository/use-this-template-button.png)
-
-From there, author(s) can [follow these instructions](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template). However do not optionally select "**Include all branches**" as you do not need this for your own projects. 
+---
 
 
-### Step 2
 
-The author(s) can then directly edit (or replace) the manuscript template files in their own GitHub repository. Author(s) can also add their own data, code, and other files as needed. 
+## References for software and data
 
-For guidance on getting started with git, we recommend the [Happy with git r](https://happygitwithr.com) tutorials.
-
-**Importantly, the authors should provide an overview of how to carry
-out the analyses presented in their manuscript in the `README.md` of their
-repository, replacing the content in this file.** This overview would
-generally refer to scripts/code files that execute the analyses and are
-placed either in the main directory or the `/code` subdirectory. The
-*Workflow* section of the ACC form should refer to this README.md as
-containing the instructions for how to reproduce the analyses.
-
-### Step 3
-
-Author(s) use `git commit` to track changes over time and use `git push`
-to push changes to a repository on the author(s) personal GitHub
-account.
-
-### Step 4
-
-Author(s) submit a link to their GitHub repository as part of the [JASA
-Reproducibility review process](https://jasa-acs.github.io/repro-guide/),
-required upon submission of an invited revision.
-
-### Step 5
-
-JASA Associate Editors for Reproducibility will review the materials in
-the GitHub repository of the authors and submit a
-reproducibility review as part of the standard JASA review process.
-Authors have the opportunity to respond to the review by making changes
-and pushing their changes to their personal GitHub repository.
-
-### Step 6
-
-Once the manuscript is accepted, the materials in the author(s) personal
-GitHub repository will be copied to the [JASA repository](https://github.com/jasa-acs).
-
-## Reproducibility materials file structure
-
-This template provides a suggested file structure for a JASA submission, but authors are free
-to modify this structure.
-
-The suggested components are as follows. Directories in the submission may have subdirectories to
-further organize the materials.
-
-1.  A `README.md` file - This file gives a short description of the
-    paper and an overview of how to carry out the analyses presented in their manuscript.
-2.  A `manuscript` directory - This directory will generally hold the source files
-    (often LaTeX or Rmd) for the manuscript and any files directly related to the
-    generation of the manuscript, including figure files.
-3.  A `data` directory - This directory will generally hold the real data files 
-    (or facsimile versions of them in place of confidential data) and simulated data files.
-    See `data/README.md` for more details. 
-4.  A `code` directory - This directory will generally hold 
-    source code files that contain the core code to implement the method and various utility/auxiliary functions.
-5.  An `output` directory - This directory will generally hold objects derived
-    from computations, including results of simulations or real data analyses. See `output/README.md` for more details.
-
-## Guidance on the use of reproducible environments
-
-Submissions may include the use of reproducible environments capturing
-state of a machine generating manuscript artifacts and even the
-manuscript itself. Here we discuss two types of reproducible
-environments and their use. Both virtual and package environments may be
-put in the `code` directory.
-
-### Package environments
-
-Package environments capture the set of packages used by a programming
-language needed to generate output. The R programming language has
-`renv`, `switchr` and others to accomplish this, Python has `venv`,
-`conda` and others, and Julia has native support (through the `Pkg`
-package). When submitting these types of environments, the following are
-suggested.
-
-1.  Clearly indicate (in the overall `README.md`) the language(s) used (including version) 
-    and the package environment tool used (e.g., `renv`, `conda`).
-2.  Use a single package environment for all reproducible content.
-3.  Prefer packages from package archives (CRAN, Bioconductor,
-    RForge.net for example).
-4.  If you use packages from a code repository (GitHub, GitLab, etc.)
-    then use a release version if possible, or indicate the commit used. You could also consider
-    forking the repository and providing a release.
-
-### Virtual environments
-
-Virtual environments such as Docker and Singlarity capture
-the entire computing environment in which computations were performed.
-In general, they are a more robust solution, capable of taking a
-“snapshot” of a machine, including any system-level utilities and
-external libraries needed to perform your computations. They have the
-advantage that reproducing materials means running the virtual
-environment, rather than recreating the programming language environment.
-If using a virtual environment, we ask that 
-you provide a definition file (e.g., a Dockerfile) or (perhaps better)
-a link to an image in a standard online registry, such as DockerHub.
-
-## References
-
-Gentleman, Robert, and Duncan Temple Lang. “[Statistical Analyses and
-Reproducible
-Research](http://biostats.bepress.com/cgi/viewcontent.cgi?article=1001&context=bioconductor).”
-(2004).
-
-Gentleman, Robert. “[Reproducible research: a bioinformatics case
-study](https://www.degruyter.com/document/doi/10.2202/1544-6115.1034/html).”
-Statistical applications in genetics and molecular biology 4.1 (2005).
-
-Marwick, Ben, and Bryan, Jennifer, and Attali, Dean, and Hollister,
-Jeffrey W. [rrrpkg Github Page](https://github.com/ropensci/rrrpkg).
+- R Core Team (2021). *R: A Language and Environment for Statistical Computing*. R Foundation for Statistical Computing.
+- Scrucca et al. (2016). mclust 5. *The R Journal*, 8(1), 289.
+- Padfield et al. (2021). rTPC and nls.multstart. *Methods in Ecology and Evolution*, 12(6), 1138–1143.
+- Miller & Harrison (2018). Mixture models with a prior on the number of components. *JASA*, 113(521), 340–356.
+- Pritchard et al. (2000). Inference of population structure using multilocus genotype data. *Genetics*, 155(2), 945–959.
+- Drinkwater et al. (2004). The large scale distribution of galaxies in the Shapley supercluster. *PASA*, 21(1), 89–96.
+- Kontopoulos et al. (2024). No universal mathematical model for thermal performance curves. *Nature Communications*, 15(1), 8855. Data: [doi:10.6084/m9.figshare.24106161.v2](https://doi.org/10.6084/m9.figshare.24106161.v2).
+- Grzebyk & Berland (1996). Influences of temperature, salinity and irradiance on growth of *Prorocentrum minimum*. *Journal of Plankton Research*, 18(10), 1837–1849.
+- Erdman et al. (2022). Broadscale population structure and hatchery introgression of Midwestern Brook Trout. *Transactions of the American Fisheries Society*, 151(1), 81–99. [doi:10.1002/tafs.10333](https://doi.org/10.1002/tafs.10333).
