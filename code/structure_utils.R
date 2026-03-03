@@ -3,7 +3,7 @@
 # ----------------------------
 parse_structure_results <- function(f, K) {
   lines <- readLines(f, warn = FALSE)
-  txt   <- paste(lines, collapse = " ")
+  txt <- paste(lines, collapse = " ")
   
   # alpha: try "alpha_j", else single "alpha"
   alpha <- NULL
@@ -32,7 +32,7 @@ parse_structure_results <- function(f, K) {
   
   for (l in seq_len(L)) {
     start <- locus_starts[l] + 2  # skip "X alleles" & "missing data"
-    end   <- if (l < L) locus_starts[l + 1] - 1 else length(lines)
+    end <- if (l < L) locus_starts[l + 1] - 1 else length(lines)
     block <- lines[start:end]
     block <- block[nzchar(trimws(block))]
     
@@ -59,7 +59,7 @@ parse_structure_results <- function(f, K) {
     }
   }
   
-  # optional summary numbers
+  # summary numbers
   get_num <- function(pattern) {
     m <- regexpr(pattern, txt)
     if (m == -1) return(NA_real_)
@@ -67,14 +67,16 @@ parse_structure_results <- function(f, K) {
   }
   
   list(
-    alpha = alpha,            # numeric length K
-    theta = theta_by_k,       # list length K; each is list length L (numeric vectors)
-    labels = labels,          # list length L (allele codes per locus)
+    alpha = alpha, # numeric length K
+    theta = theta_by_k, # list length K; each is list length L (numeric vectors)
+    labels = labels, # list length L (allele codes per locus)
     estimated_ln_prob  = get_num("Estimated Ln Prob of Data *= *-?[0-9]+\\.?[0-9]*"),
     mean_ln_likelihood = get_num("Mean value of ln likelihood *= *-?[0-9]+\\.?[0-9]*"),
     var_ln_likelihood  = get_num("Variance of ln likelihood *= *[0-9]+\\.?[0-9]*")
   )
 }
+
+
 
 find_locus_map <- function(X, labels) {
   L  <- ncol(X) / 2
@@ -90,7 +92,7 @@ find_locus_map <- function(X, labels) {
     C[d,l] <- length(intersect(a,b))/length(union(a,b))
   }
   
-  # greedy assignment (fine for small L). If 'clue' is installed you can swap to LSAP.
+  # greedy assignment (fine for small L). 
   map <- rep(NA_integer_, L); used <- rep(FALSE, L)
   order_d <- order(apply(C, 1, max), decreasing = TRUE)
   for (d in order_d) {
@@ -106,14 +108,13 @@ find_locus_map <- function(X, labels) {
 compute_point_nll <- function(X, alpha, theta, labels, S = 1000, eps = 1e-12, auto_map = TRUE) {
   n <- nrow(X); P <- ncol(X); L <- P/2; K <- length(theta)
   
-  # optional locus permutation to match X
+  # locus permutation to match X
   loc_map <- if (auto_map) find_locus_map(X, labels) else seq_len(L)
   labels <- labels[loc_map]
   theta <- lapply(theta, function(thk) thk[loc_map])
   
   idx_of <- function(l, v) match(v, labels[[l]])  # NA if allele unseen at locus l
   
-  # nll <- numeric(n)
   nll <- rep(0, n)
   
   if (K == 1) {
@@ -137,7 +138,7 @@ compute_point_nll <- function(X, alpha, theta, labels, S = 1000, eps = 1e-12, au
   # K > 1: Monte Carlo Dirichlet integral
   alpha <- as.numeric(alpha)
   for (i in seq_len(n)) {
-    xi  <- as.integer(X[i, ])
+    xi <- as.integer(X[i, ])
     obs <- which(!is.na(xi))
     
     U <- matrix(rgamma(S * K, shape = alpha, rate = 1), nrow = S, ncol = K, byrow = TRUE)
@@ -146,8 +147,8 @@ compute_point_nll <- function(X, alpha, theta, labels, S = 1000, eps = 1e-12, au
     
     logA <- matrix(0, nrow = S, ncol = P)
     for (j in obs) {
-      l   <- ceiling(j/2)
-      v   <- xi[j]
+      l <- ceiling(j/2)
+      v <- xi[j]
       idx <- idx_of(l, v)
       logTheta <- vapply(seq_len(K), function(k) {
         if (is.na(idx)) log(eps) else log( max(theta[[k]][[l]][idx], eps) )
