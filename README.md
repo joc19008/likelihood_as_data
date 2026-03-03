@@ -1,6 +1,6 @@
 # Robust Model Selection using Likelihood as Data
 
-This repository contains all code and data needed to reproduce the analyses, figures, and tables in the manuscript *Robust Model Selection using Likelihood as Data* ([arXiv](https://arxiv.org/abs/2602.23355)).
+This repository contains all code and data needed to reproduce the analyses, figures, and tables in the manuscript *Robust Model Selection using Likelihood as Data*. 
 
 ---
 
