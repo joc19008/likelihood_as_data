@@ -60,7 +60,8 @@ The MFM posterior was computed using [BayesianMixtures.jl](https://github.com/jw
 
 ### STRUCTURE (optional)
 
-The admixture example (Section S3) uses precomputed STRUCTURE 2.3.4 output in `data/processed/structure_run/`. To re-run from scratch:
+The population structure admixture models (Section S3) uses STRUCTURE 2.3.4 to fit the admixture model. All STRUCTURE outputs needed for the figures are already included in `data/processed/structure_run/`, so STRUCTURE is not required to reproduce the results. 
+The instructions below are only for readers who wish to re-fit the model.
 
 **Software**
 - STRUCTURE 2.3.4 — download from [pritchardlab.stanford.edu](https://web.stanford.edu/group/pritchardlab/structure.html)
@@ -74,9 +75,10 @@ The admixture example (Section S3) uses precomputed STRUCTURE 2.3.4 output in `d
 - Written to: `data/processed/structure_run/`
 - Naming convention: `results_K{K}_rep{rep}` (plus STRUCTURE suffixes)
 
-**Command**
+**Example command-line loop**
 ```bash
 mkdir -p data/processed/structure_run
+
 for K in {1..10}; do
   for rep in {1..20}; do
     SEED=$((1000 * K + rep))
