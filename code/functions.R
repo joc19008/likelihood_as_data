@@ -9,8 +9,8 @@
 
 #' Draw NIW posterior samples for the LaD mean vector
 #'
-#' Fits a Normal-Inverse-Wishart conjugate model to the LaD matrix Z and
-#' returns posterior draws of mu and Sigma. Implements Step 3 of Algorithm 1 (Section 3.1).
+#' Fits a Normal-Inverse-Wishart conjugate model to the LaD matrix Z and returns posterior draws of mu and Sigma. 
+#' Implements Step 3 of Algorithm 1 (Section 3.1).
 #'
 #' @param Z : n x K matrix of per-observation loss values (raw, MLE plug-in, or bias-corrected)
 #' @param mu0 : length-K prior mean vector; recommended default is rep(0, K)
@@ -108,17 +108,14 @@ nig_posterior <- function(Z, mu0, lambda0, a0, b0, n_samples) {
 
 #' Compute SLC scores for LaD model selection
 #'
-#' Implements Algorithm 2 to compute the Smooth LaD Criterion (SLC) score
-#' w_delta(k) for each of the K candidate models (Definition 2, Section 2.2).
-#' Each score is the product of a between-class selection probability and a
-#' within-class soft-minimum weight. Setting mode = "hard" produces the
-#' unstable alternative from Theorem 4.4(b), included for comparison only.
+#' Implements Algorithm 2 to compute the Smooth LaD Criterion (SLC) score w_delta(k) for each of the K candidate models (Definition 2, Section 2.2).
+#' Setting mode = "hard" produces the alternative from Theorem 4.4(b).
 #'
 #' @param mu_samples : S x K matrix of posterior draws of mu, e.g. the mu element from niw_posterior()
 #' @param complexities : integer vector of length K giving the complexity c(k) of each model (smaller = simpler)
 #' @param delta : non-negative tolerance scalar; a model is delta-optimal if its mean is within delta of the minimum (Definition 1)
 #' @param alpha : temperature parameter alpha_n > 0; should satisfy alpha_n -> Inf and alpha_n = o(sqrt(n)); recommended n^0.45; ignored when mode = "hard"
-#' @param mode : "soft" (default, proposed method) or "hard" (unstable alternative for comparison)
+#' @param mode : "soft" (default, proposed method) or "hard" (Bayesian plug-in method)
 #' @param tol : tie tolerance used in mode = "hard", default is 1e-12
 #'
 #' @return numeric vector of length K with the SLC score for each model
@@ -169,11 +166,10 @@ selection_probabilities <- function(mu_samples, complexities, delta, alpha_n,
 
 #' Coarsened posterior model probabilities for sparse MVN mean models
 #'
-#' Computes model probabilities under the coarsened (power) posterior of
-#' Miller & Dunson (2019) for Gaussian models with identity covariance and
-#' sparse mean vectors. Used as a comparison method in the sparse MVN
-#' simulation (Section 5.2.1, labeled "c-posterior"). As alpha -> Inf,
-#' zeta_n -> 1 and this recovers the standard Bayesian posterior.
+#' Computes model probabilities under the coarsened (power) posterior of Miller & Dunson (2019) for 
+#' Gaussian models with identity covariance and sparse mean vectors. 
+#' Used as a comparison method in the sparse MVN simulation (Section 5.2.1, labeled "c-posterior").
+#' As alpha -> Inf, zeta_n -> 1 and this recovers the standard Bayesian posterior.
 #'
 #' @param x : n x d data matrix
 #' @param models : list of length K; each element is an integer vector of free coordinate indices for that model

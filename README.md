@@ -101,9 +101,9 @@ All datasets are included to facilitate reproduction of the results. Please cite
 
 | Dataset | File | Source | License |
 |---------|------|--------|---------|
-| Shapley galaxy radial velocities | `data/raw/shapley/Shapley_galaxy.dat` | Drinkwater et al. (2004), data: [Penn State Astrostatistics](https://sites.psu.edu/astrostatistics/datasets-shapley-galaxy-dataset/) | No restrictions; please cite source |
-| *P. minimum* growth rates | `data/raw/tpc/thermal_performance_datasets.csv` | Kontopoulos et al. (2024), Figshare [doi:10.6084/m9.figshare.24106161.v3](https://doi.org/10.6084/m9.figshare.24106161.v3) | **CC BY 4.0** |
-| Brook trout microsatellite genotypes | `data/raw/admixture/brooktrout.txt` | Erdman et al. (2022); data: [USGS ScienceBase](https://www.sciencebase.gov/catalog/item/611d264cd34e40dd9c01284e) | **U.S. public domain** (USGS data release) |
+| Shapley galaxy radial velocities | `data/raw/shapley/Shapley_galaxy.dat` | Drinkwater et al. (2004), [data](https://sites.psu.edu/astrostatistics/datasets-shapley-galaxy-dataset/) | No restrictions; please cite source |
+| *P. minimum* growth rates | `data/raw/tpc/thermal_performance_datasets.csv` | Kontopoulos et al. (2024), [data](https://doi.org/10.6084/m9.figshare.24106161.v3) | **CC BY 4.0** |
+| Brook trout microsatellite genotypes | `data/raw/admixture/brooktrout.txt` | Erdman et al. (2022), [data](https://www.sciencebase.gov/catalog/item/611d264cd34e40dd9c01284e) | **U.S. public domain** (USGS data release) |
 
 ---
 
