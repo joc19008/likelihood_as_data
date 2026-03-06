@@ -28,7 +28,7 @@ All scripts source `code/functions.R`, which contains the core LaD functions. Ru
 | `code/examples/02_sparseMVN.R`            | Section 5.2      | Figures 4, 5 |
 | `code/examples/03_tpc.R`                  | Section 5.3      | Figure 6     |
 | `code/examples/04_structure_admixture.R`  | Section S3       | Figure S1, S2    |
-| `code/theory/instability.R`               | Section 4.2      | Figure 2     |
+| `code/instability.R`               | Section 4.2      | Figure 2     |
 
 All figures are saved to `output/figures`.
 
